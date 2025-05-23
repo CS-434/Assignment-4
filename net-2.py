@@ -26,103 +26,104 @@ activation = "ReLU" if False else "Sigmoid"
 
 def main():
 
-  # Load data and display an example
-  X_train, Y_train, X_val, Y_val, X_test = loadData()
-  displayExample(X_train[np.random.randint(0,len(X_train))])
+    # Load data and display an example
+    X_train, Y_train, X_val, Y_val, X_test = loadData()
+
+    for _step_size in [0.0001, 0.01, 5, 10]:
+        logging.info(f'Step Size = {_step_size}')
+        step_size = _step_size
+        # Build a network with input feature dimensions, output feature dimension,
+        # hidden dimension, and number of layers as specified below
+        net = FeedForwardNeuralNetwork(X_train.shape[1],10,width_of_layers,number_of_layers, activation=activation)
+
+        # Some lists for book-keeping for plotting later
+        losses = []
+        val_losses = []
+        accs = []
+        val_accs = []
 
 
-  # Build a network with input feature dimensions, output feature dimension,
-  # hidden dimension, and number of layers as specified below
-  net = FeedForwardNeuralNetwork(X_train.shape[1],10,width_of_layers,number_of_layers, activation=activation)
+        # Loss function
+        lossFunc = CrossEntropySoftmax()
 
-  # Some lists for book-keeping for plotting later
-  losses = []
-  val_losses = []
-  accs = []
-  val_accs = []
+        # Indicies we will use to shuffle data randomly
+        inds = np.arange(len(X_train))
+        for i in range(max_epochs):
+            
+            # Shuffled indicies so we go through data in new random batches
+            np.random.shuffle(inds)
 
+            # Go through all datapoints once (aka an epoch)
+            j = 0
+            acc_running = loss_running = 0
+            while j < len(X_train):
 
-  # Loss function
-  lossFunc = CrossEntropySoftmax()
+                # Select the members of this random batch
+                b = min(batch_size, len(X_train)-j)
+                X_batch = X_train[inds[j:j+b]]
+                Y_batch = Y_train[inds[j:j+b]].astype(int)
+                
+                # Compute the scores for our 10 classes using our model
+                logits = net.forward(X_batch)
+                loss = lossFunc.forward(logits, Y_batch)
+                acc = np.mean( np.argmax(logits,axis=1)[:,np.newaxis] == Y_batch)
+                
+                # Compute gradient of Cross-Entropy Loss with respect to logits
+                loss_grad = lossFunc.backward()
 
-  # Indicies we will use to shuffle data randomly
-  inds = np.arange(len(X_train))
-  for i in range(max_epochs):
-    
-    # Shuffled indicies so we go through data in new random batches
-    np.random.shuffle(inds)
+                # Pass gradient back through networks
+                net.backward(loss_grad)
 
-    # Go through all datapoints once (aka an epoch)
-    j = 0
-    acc_running = loss_running = 0
-    while j < len(X_train):
+                # Take a step of gradient descent
+                net.step(step_size)
 
-      # Select the members of this random batch
-      b = min(batch_size, len(X_train)-j)
-      X_batch = X_train[inds[j:j+b]]
-      Y_batch = Y_train[inds[j:j+b]].astype(np.int)
-    
-      # Compute the scores for our 10 classes using our model
-      logits = net.forward(X_batch)
-      loss = lossFunc.forward(logits, Y_batch)
-      acc = np.mean( np.argmax(logits,axis=1)[:,np.newaxis] == Y_batch)
-      
-      # Compute gradient of Cross-Entropy Loss with respect to logits
-      loss_grad = lossFunc.backward()
+                #Record losses and accuracy then move to next batch
+                losses.append(loss)
+                accs.append(acc)
+                loss_running += loss*b
+                acc_running += acc*b
 
-      # Pass gradient back through networks
-      net.backward(loss_grad)
+                j+=batch_size
 
-      # Take a step of gradient descent
-      net.step(step_size)
+            # Evaluate performance on validation. This function looks very similar to the training loop above, 
+            vloss, vacc = evaluateValidation(net, X_val, Y_val, batch_size)
+            val_losses.append(vloss)
+            val_accs.append(vacc)
+                
+            # Print out the average stats over this epoch
+            logging.info("[Epoch {:3}]   Loss:  {:8.4}     Train Acc:  {:8.4}%      Val Acc:  {:8.4}%".format(i,loss_running/len(X_train), acc_running / len(X_train)*100,vacc*100))
 
-      #Record losses and accuracy then move to next batch
-      losses.append(loss)
-      accs.append(acc)
-      loss_running += loss*b
-      acc_running += acc*b
-
-      j+=batch_size
-
-    # Evaluate performance on validation. This function looks very similar to the training loop above, 
-    vloss, vacc = evaluateValidation(net, X_val, Y_val, batch_size)
-    val_losses.append(vloss)
-    val_accs.append(vacc)
-    
-    # Print out the average stats over this epoch
-    logging.info("[Epoch {:3}]   Loss:  {:8.4}     Train Acc:  {:8.4}%      Val Acc:  {:8.4}%".format(i,loss_running/len(X_train), acc_running / len(X_train)*100,vacc*100))
-
-    
+            
 
 
-  fig, ax1 = plt.subplots(figsize=(16,9))
-  color = 'tab:red'
-  ax1.plot(range(len(losses)), losses, c=color, alpha=0.25, label="Train Loss")
-  ax1.plot([np.ceil((i+1)*len(X_train)/batch_size) for i in range(len(val_losses))], val_losses,c="red", label="Val. Loss")
-  ax1.set_xlabel("Iterations")
-  ax1.set_ylabel("Avg. Cross-Entropy Loss", c=color)
-  ax1.tick_params(axis='y', labelcolor=color)
-  ax1.set_ylim(-0.01,3)
+        fig, ax1 = plt.subplots(figsize=(16,9))
+        color = 'tab:red'
+        ax1.plot(range(len(losses)), losses, c=color, alpha=0.25, label="Train Loss")
+        ax1.plot([np.ceil((i+1)*len(X_train)/batch_size) for i in range(len(val_losses))], val_losses,c="red", label="Val. Loss")
+        ax1.set_xlabel("Iterations")
+        ax1.set_ylabel("Avg. Cross-Entropy Loss", c=color)
+        ax1.tick_params(axis='y', labelcolor=color)
+        ax1.set_ylim(-0.01,3)
 
-  ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
 
-  color = 'tab:blue'
-  ax2.plot(range(len(losses)), accs, c=color, label="Train Acc.", alpha=0.25)
-  ax2.plot([np.ceil((i+1)*len(X_train)/batch_size) for i in range(len(val_accs))], val_accs,c="blue", label="Val. Acc.")
-  ax2.set_ylabel(" Accuracy", c=color)
-  ax2.tick_params(axis='y', labelcolor=color)
-  ax2.set_ylim(-0.01,1.01)
+        color = 'tab:blue'
+        ax2.plot(range(len(losses)), accs, c=color, label="Train Acc.", alpha=0.25)
+        ax2.plot([np.ceil((i+1)*len(X_train)/batch_size) for i in range(len(val_accs))], val_accs,c="blue", label="Val. Acc.")
+        ax2.set_ylabel(" Accuracy", c=color)
+        ax2.tick_params(axis='y', labelcolor=color)
+        ax2.set_ylim(-0.01,1.01)
 
-  fig.tight_layout()  # otherwise the right y-label is slightly clipped
-  ax1.legend(loc="center")
-  ax2.legend(loc="center right")
-  plt.show()
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+        ax1.legend(loc="center")
+        ax2.legend(loc="center right")
+        plt.show()
 
 
-  ################################
-  # Q7 Evaluate on Test
-  ################################
-  raise Exception('Student error: You haven\'t implemented evaluating the test set yet.')
+    ################################
+    # Q7 Evaluate on Test
+    ################################
+    raise Exception('Student error: You haven\'t implemented evaluating the test set yet.')
 
 
 
@@ -142,10 +143,9 @@ class LinearLayer:
   # Q3 Implementing Backward Pass for Linear
   #################################################
   def backward(self, grad):
-    raise Exception('Student error: You haven\'t implemented the backward pass for linear yet.')
-    self.grad_weights = #TODO1
-    self.grad_bias = #TODO2
-    return #TODO3
+    self.grad_weights = self.input.T @ grad
+    self.grad_bias = np.sum(grad, axis=0)
+    return grad @ self.weights.T
     
   def step(self, step_size):
     self.weights -= step_size*self.grad_weights
@@ -258,7 +258,7 @@ def evaluateValidation(model, X_val, Y_val, batch_size):
   while j < len(X_val):
     b = min(batch_size, len(X_val)-j)
     X_batch = X_val[j:j+b]
-    Y_batch = Y_val[j:j+b].astype(np.int)
+    Y_batch = Y_val[j:j+b].astype(int)
    
     logits = model.forward(X_batch)
     loss = lossFunc.forward(logits, Y_batch)
@@ -295,8 +295,8 @@ def loadData(normalize = True):
     X_val = val[:,:-1]
     X_test = test
 
-  Y_train = train[:,-1].astype(np.int)[:,np.newaxis]
-  Y_val = val[:,-1].astype(np.int)[:,np.newaxis]
+  Y_train = train[:,-1].astype(int)[:,np.newaxis]
+  Y_val = val[:,-1].astype(int)[:,np.newaxis]
 
   logging.info("Loaded train: " + str(X_train.shape))
   logging.info("Loaded val: " + str(X_val.shape))
