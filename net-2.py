@@ -14,24 +14,23 @@ matplotlib.rc('font', **font)
 
 
 # GLOBAL PARAMETERS FOR STOCHASTIC GRADIENT DESCENT
-np.random.seed(102)
-step_size = 0.01
+np.random.seed(15024)
+step_size = 0.005
 batch_size = 200
-max_epochs = 200
+max_epochs = 170
 
 # GLOBAL PARAMETERS FOR NETWORK ARCHITECTURE
-number_of_layers = 2
+number_of_layers = 4
 width_of_layers = 16  # only matters if number of layers > 1
-activation = "ReLU" if False else "Sigmoid" 
+activation = "ReLU" if True else "Sigmoid" 
 
 def main():
 
     # Load data and display an example
     X_train, Y_train, X_val, Y_val, X_test = loadData()
 
-    for _step_size in [0.0001, 0.01, 5, 10]:
-        logging.info(f'Step Size = {_step_size}')
-        step_size = _step_size
+    for _step_size in [1]:
+        #step_size = _step_size
         # Build a network with input feature dimensions, output feature dimension,
         # hidden dimension, and number of layers as specified below
         net = FeedForwardNeuralNetwork(X_train.shape[1],10,width_of_layers,number_of_layers, activation=activation)
@@ -57,7 +56,6 @@ def main():
             j = 0
             acc_running = loss_running = 0
             while j < len(X_train):
-
                 # Select the members of this random batch
                 b = min(batch_size, len(X_train)-j)
                 X_batch = X_train[inds[j:j+b]]
@@ -123,7 +121,21 @@ def main():
     ################################
     # Q7 Evaluate on Test
     ################################
-    raise Exception('Student error: You haven\'t implemented evaluating the test set yet.')
+    with open("test_result.csv", "w") as f:
+        f.write("id,digit\n")
+        j = 0
+        i = 0
+        while j < len(X_test):
+            X_batch = X_test[j:j+b]
+          
+            logits = net.forward(X_batch)
+
+            results = np.argmax(logits,axis=1)[:,np.newaxis]
+            for result in results:
+              f.write(f"{i},{result[0]}\n")
+              i+=1
+              
+            j+=batch_size
 
 
 
